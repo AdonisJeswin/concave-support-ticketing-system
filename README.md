@@ -72,17 +72,20 @@ Complete API endpoint specifications (request schemas, response models, query pa
 ## 8. Assumptions and Decisions
 
 ### A. TAT Calculation
+
 - **Decision**: Turnaround Time (TAT) runs continuously, 24 hours a day, 7 days a week, including weekends and public holidays.
 - **Rationale**: Market research cycles at Concave Insights operate on rigid 15-day timelines without pauses for non-working days; participant inquiries must be addressed within continuous wall-clock windows.
 - **Example**: A High-priority ticket created at 11:00 PM on a Saturday with a 4-hour TAT becomes overdue and escalates at 3:00 AM on Sunday.
 
 ### B. Waiting for Member (TAT Pause)
+
 - **Decision**: TAT pauses when a support agent marks a response with the "Waiting for Member" flag requesting additional clarification. The clock resumes automatically when the member submits a reply.
 - **Rationale**: Agents must not be penalized for resolution delays caused by participants taking days to upload verification documents, transaction IDs, or screenshots.
 - **Preservation Rule**: The exact remaining resolution time before the deadline is preserved to the second and added to the resumption timestamp.
 - **Overdue Boundary**: If a ticket was already overdue before pausing (`due_at <= CURRENT_TIMESTAMP`), pausing freezes active overdue accrual, but resumption grants no additional SLA time and immediately leaves the ticket in overdue/escalated status.
 
 ### C. Default Priority Mapping and Recalculation
+
 - **Decision**: Every ticket category maps to a default priority upon creation:
   - **Payment**: `HIGH` (Incentives and payouts directly impact member retention and trust)
   - **Profile Change**: `MEDIUM` (Account detail modifications, KYC data updates)
@@ -90,9 +93,10 @@ Complete API endpoint specifications (request schemas, response models, query pa
   - **Eligibility**: `MEDIUM` (Questions regarding the 3-month cooling period or project criteria)
   - **Other**: `LOW` (General questions or feedback)
 - **Override Rule**: Support agents can manually modify ticket priority with a mandatory audit reason.
-- **Active-Time Recalculation**: Remaining SLA is computed based on active consumed time ($t_{\text{active}}$), properly distinguishing unpaused tickets from currently paused tickets to prevent double-counting pause intervals.
+- **Active-Time Recalculation**: Remaining SLA is computed based on active consumed time (`t_active`), properly distinguishing unpaused tickets from currently paused tickets to prevent double-counting pause intervals.
 
 ### D. Default TAT Durations
+
 - **Decision**: Baseline turnaround times are configured as:
   - `HIGH`: 4 hours
   - `MEDIUM`: 24 hours
@@ -100,6 +104,7 @@ Complete API endpoint specifications (request schemas, response models, query pa
 - **Administrative Flexibility**: The Support Head can recalibrate these durations at any time through the administrative settings panel.
 
 ### E. Reopening Policy
+
 - **Decision**: Members may reopen a `RESOLVED` ticket within 7 calendar days of resolution.
 - **Limits & Safeguards**:
   - Maximum of 2 lifetime reopen attempts per ticket to prevent perpetual resolution churn.
@@ -107,15 +112,18 @@ Complete API endpoint specifications (request schemas, response models, query pa
   - Beyond 7 days or after 2 attempts, the ticket is permanently closed, requiring a new inquiry.
 
 ### F. Automatic Escalation and De-escalation
+
 - **Decision**: An automated background worker checks active tickets every 60 seconds using the condition `due_at <= CURRENT_TIMESTAMP`. Any non-paused, non-resolved ticket exceeding its deadline transitions immediately to `ESCALATED`.
 - **Supervisory Routing**: The Support Head receives an immediate in-app dashboard notification. The system appends an automated audit record to `TICKET_HISTORY` with `actor_id = NULL` and action `ESCALATED`.
 - **Return to Active Handling**: Escalated tickets return to active handling exclusively through the Support Head via action `ESCALATION_RESOLVED`. The original overdue deadline is preserved; the system does not silently grant a fresh SLA.
 
 ### G. Timezone and Timestamp Handling
+
 - **Decision**: All database timestamps (`created_at`, `due_at`, `resolved_at`, `tat_paused_at`) are stored strictly in UTC.
 - **Presentation**: Timestamps are localized on the frontend client according to the user's local timezone.
 
 ### H. Database Selection
+
 - **Decision**: SQLite is selected as the primary database for development and demonstration.
 - **Rationale**: Provides zero-configuration setup, full ACID compliance, and excellent local developer experience. SQLAlchemy abstraction allows clean migration to PostgreSQL if production deployment demands high concurrency.
 
@@ -124,9 +132,11 @@ Complete API endpoint specifications (request schemas, response models, query pa
 ## 9. Known Issues and Next Steps
 
 ### Current Status
+
 - Application implementation has not started yet. This repository currently contains the completed system architecture, entity relationships, and workflow documentation for the Day 2 assessment deliverable.
 
 ### Planned Next Steps (Implementation Phase)
+
 1. Initialize FastAPI backend structure with dependency management.
 2. Implement SQLAlchemy models matching the defined schema in `design/database-erd.md`.
 3. Set up Alembic migrations and database seed script with mock users, categories, and initial settings.
