@@ -9,7 +9,7 @@ Concave Insights conducts high-velocity consumer research studies operating in s
 ## 2. Tech Stack
 
 - **Backend**: Python with FastAPI (RESTful API, asynchronous request handling, background task scheduling)
-- **Frontend**: React with Vite (Single Page Application, responsive component architecture)
+- **Frontend**: React with Vite (Single Page Application, responsive component architecture — Planned Day 4)
 - **Database**: SQLite (Relational data storage with lightweight, zero-configuration local portability)
 - **ORM**: SQLAlchemy (Object-relational mapping, declarative schema, transaction management)
 - **Styling**: Tailwind CSS (Utility-first responsive design and consistent UI tokens)
@@ -19,13 +19,70 @@ Concave Insights conducts high-velocity consumer research studies operating in s
 
 ## 3. Setup and Run
 
-Application implementation is planned for subsequent milestones. Complete setup, environment configuration, dependency installation, and execution instructions for both backend and frontend services will be documented here as development commences. No execution commands are currently provided to avoid running an application that has not yet been built.
+### Prerequisites
+
+- Python 3.10+ (Tested on Python 3.13)
+- Git
+
+### 1. Environment Configuration
+
+Clone the repository and copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+### 2. Dependency Installation
+
+Install backend dependencies from `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Database Initialization & Seeding
+
+Run the repeatable seed script to create all seven SQLite tables, apply immutability triggers, and populate demo users, inquiry categories, SLA rules, and test tickets:
+
+```bash
+python seed.py
+```
+
+### 4. Running Automated Tests
+
+Execute the complete Pytest suite (25 automated test cases covering authentication, RBAC, ticket workflows, SLA mathematics, and audit triggers):
+
+```bash
+python -m pytest -v
+```
+
+### 5. Launching the Backend Server
+
+Start the FastAPI application with Uvicorn:
+
+```bash
+uvicorn backend.app.main:app --reload --port 8000
+```
+
+- **Interactive API Documentation (Swagger UI)**: `http://localhost:8000/docs`
+- **Alternative Documentation (ReDoc)**: `http://localhost:8000/redoc`
+- **API Health Check**: `http://localhost:8000/health`
 
 ---
 
 ## 4. Demo Logins and Test Data
 
-Pre-seeded demo user accounts representing all three operational roles (Member, Support Agent, and Support Head / Admin), along with comprehensive seed datasets covering sample research projects and tickets, will be populated during the implementation phase.
+The database seed script (`seed.py`) pre-configures standard test accounts across all three operational roles:
+
+| Role | Name | Email | Password | Primary Capabilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **SUPPORT_HEAD** | Sarah Jenkins | `admin@concave.com` | `password123` | Executive metrics, SLA hours configuration, escalated ticket review & reassignment |
+| **AGENT** | Alex Rivera | `agent1@concave.com` | `password123` | Queue filtering & search, self-assignment, priority changes, TAT pause, resolution |
+| **AGENT** | David Chen | `agent2@concave.com` | `password123` | Queue filtering, thread replies, verification document requests |
+| **MEMBER** | Adonis Jeswin | `member1@surveyuser.com` | `password123` | Ticket creation, tracking own tickets, thread responses, reopening within 7-day window |
+| **MEMBER** | Priya Sharma | `member2@surveyuser.com` | `password123` | Ticket creation, resolution confirmation, and thread communication |
+
+*Note: For testing, the `/api/auth/mock-login` endpoint also allows instant token generation by role.*
 
 ---
 
@@ -42,15 +99,27 @@ Pre-seeded demo user accounts representing all three operational roles (Member, 
 - Audit logging and database integrity specifications.
 - Technical assumptions and critical edge cases.
 
-### Planned — Application Implementation
+### Completed — Day 3 Backend Milestone
 
-- Member, Agent, and Support Head dashboards.
-- Ticket creation, assignment, messaging, and resolution.
-- Automated TAT monitoring and escalation.
-- Waiting-for-Member pause/resume functionality.
-- Controlled ticket reopening and automatic closure.
-- Configurable SLA policies.
-- Dashboard analytics and reporting.
+- **FastAPI Core Application**: RESTful modular API architecture with CORS, dependency injection, and centralized exception handling.
+- **SQLAlchemy 7-Table Schema**: Fully implemented relational models (`USERS`, `CATEGORIES`, `TICKETS`, `REPLIES`, `TICKET_HISTORY`, `TAT_SETTINGS`, `SYSTEM_SETTINGS`) with SQLite foreign key pragma and database immutability triggers.
+- **Secure Authentication & RBAC**: Passlib/bcrypt password hashing, JWT token authentication, and role-based route guards for `MEMBER`, `AGENT`, and `SUPPORT_HEAD`.
+- **Approved Category-to-Priority Mapping**: Automatic default priority assignment (`Payment: HIGH`, `Survey Issue: HIGH`, `Profile Change: MEDIUM`, `Eligibility: MEDIUM`, `Other: LOW`).
+- **Ticket Lifecycle Engine**: Atomic ticket number generator (`TKT-0042`), ticket creation, assignment, resolution, member confirmation closure, and 7-day/2-attempt reopening validation.
+- **Continuous 24/7 SLA Service**: Turnaround time calculation without holiday/weekend pauses, overdue deadline tracking (`due_at <= CURRENT_TIMESTAMP`), and automatic supervisory escalation.
+- **Stateful Waiting-for-Member TAT Pause/Resume**: Agent toggles pause on reply; member response automatically resumes the clock, preserves active remaining seconds, and prevents abuse on already overdue tickets.
+- **Priority Modification with Audit Log**: Recalculates remaining SLA while preserving consumed active time (distinguishing paused from unpaused states) with mandatory audit reason.
+- **Support Head Escalation Triage**: Dedicated supervisor review and reassignment workflow returning escalated tickets to active handling (`ESCALATION_RESOLVED`) while preserving overdue deadlines.
+- **Executive Metrics & Policy Controls**: Real-time calculations for Total Open, Overdue, Escalated, Resolved Today, Average Resolution Time (ART), and category distributions.
+- **Automated Pytest Suite**: 25 automated unit and integration tests passing with 100% success rate.
+- **Repeatable Seed Data**: Automated generation of accounts, categories, and test tickets across all lifecycle states.
+
+### Planned — Day 4 Frontend Milestone
+
+- Member, Agent, and Support Head dashboards in React + Vite with Tailwind CSS.
+- Interactive ticket queue with real-time filters and search.
+- Conversation thread UI with Waiting-for-Member pause badge.
+- Support Head analytics visual charts and SLA configuration panel.
 
 ---
 
@@ -65,7 +134,34 @@ Complete specifications for data persistence, entity relationships, integrity co
 
 ## 7. API Endpoints
 
-Complete API endpoint specifications (request schemas, response models, query parameters, and error status codes) will be documented as the FastAPI backend routing and controller layers are implemented.
+### Authentication (`/api/auth`)
+- `POST /api/auth/login`: Authenticate with email and password to receive JWT bearer token.
+- `POST /api/auth/token`: OAuth2 password request form for Swagger UI testing.
+- `POST /api/auth/mock-login`: Instant role-based authentication (`MEMBER`, `AGENT`, `SUPPORT_HEAD`).
+- `GET /api/auth/me`: Retrieve authenticated user profile.
+
+### Categories (`/api/categories`)
+- `GET /api/categories`: Retrieve active inquiry categories with default priority mappings.
+
+### Tickets (`/api/tickets`)
+- `POST /api/tickets`: Raise a new ticket with automatic priority and initial 24/7 SLA.
+- `GET /api/tickets`: Query tickets with role isolation, status/priority/category/overdue filters, and keyword search.
+- `GET /api/tickets/{id}`: Retrieve detailed ticket view with conversation thread and audit history.
+- `POST /api/tickets/{id}/replies`: Post thread reply with optional Waiting-for-Member TAT pause flag.
+- `PATCH /api/tickets/{id}/assign`: Assign or self-claim an ordinary ticket.
+- `PATCH /api/tickets/{id}/priority`: Update priority with mandatory explanation and SLA recalculation.
+- `POST /api/tickets/{id}/resolve`: Mark ticket as resolved with resolution summary note.
+- `POST /api/tickets/{id}/close`: Member confirms satisfactory resolution and permanently closes ticket.
+- `POST /api/tickets/{id}/reopen`: Member reopens ticket within 7-day window and maximum 2 attempts limit.
+- `POST /api/tickets/{id}/reassign-escalated`: Support Head reviews and returns escalated ticket to active handling.
+
+### Admin & SLA Configuration (`/api/admin`)
+- `GET /api/admin/metrics`: Executive KPI metrics (Open, Overdue, Escalated, Resolved Today, ART, Categories).
+- `GET /api/admin/tat-settings`: List configured resolution hours per priority level.
+- `PUT /api/admin/tat-settings/{priority}`: Update SLA turnaround hours for a priority level.
+- `GET /api/admin/system-settings`: Retrieve global reopening and auto-close parameters.
+- `PUT /api/admin/system-settings`: Update global system configuration.
+- `POST /api/admin/run-escalation-check`: Trigger background overdue SLA escalation scanner.
 
 ---
 
@@ -133,15 +229,15 @@ Complete API endpoint specifications (request schemas, response models, query pa
 
 ### Current Status
 
-- Application implementation has not started yet. This repository currently contains the completed system architecture, entity relationships, and workflow documentation for the Day 2 assessment deliverable.
+- **Day 3 Backend Milestone Complete**: All backend models, API routes, RBAC permissions, SLA calculation engines, audit triggers, and test suites are implemented and validated (25/25 automated tests passing).
 
-### Planned Next Steps (Implementation Phase)
+### Planned Next Steps (Day 4 Frontend Milestone)
 
-1. Initialize FastAPI backend structure with dependency management.
-2. Implement SQLAlchemy models matching the defined schema in `design/database-erd.md`.
-3. Set up Alembic migrations and database seed script with mock users, categories, and initial settings.
-4. Build REST API endpoints for user authentication, ticket lifecycle, thread messages, and administrative controls.
-5. Implement background scheduler for continuous SLA tracking and automatic overdue escalations.
-6. Scaffold React + Vite frontend with Tailwind CSS.
-7. Construct role-specific views: Member Dashboard, Agent Support Queue, and Support Head Analytics.
-8. Validate end-to-end user flows including TAT pause/resume and reopening validation rules.
+1. Scaffold React frontend with Vite and Tailwind CSS.
+2. Implement mock authentication and role switcher UI for demonstration.
+3. Build Member Dashboard: ticket creation form, active ticket tracker, and conversation view.
+4. Build Agent Support Queue: multi-parameter filtering, search, self-assignment, and resolution workflow.
+5. Build Support Head Console: executive KPI cards, category breakdown charts, and SLA policy editor.
+6. Implement in-app escalation feed and supervisor reassignment dialog.
+7. Conduct full end-to-end user acceptance testing across frontend and backend.
+8. Validate production build and prepare final assessment submission deliverables.
