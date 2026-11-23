@@ -12,15 +12,18 @@ const MemberDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const fetchTickets = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const res = await api.get('/tickets');
       setTickets(res.data);
     } catch (err) {
       console.error('Failed to load member tickets:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load member tickets.');
     } finally {
       setIsLoading(false);
     }
@@ -106,6 +109,15 @@ const MemberDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between text-xs text-rose-700 shadow-sm">
+          <span>{error}</span>
+          <button onClick={fetchTickets} className="font-semibold underline ml-2 hover:text-rose-900">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Page Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-gray-200">
         <div>

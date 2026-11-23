@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -5,7 +6,7 @@ from backend.app.database import get_db
 from backend.app.models.user import User
 from backend.app.schemas.user import LoginRequest, MockLoginRequest, TokenResponse, UserOut
 from backend.app.services.auth_service import verify_password, create_access_token
-from backend.app.dependencies import get_current_user
+from backend.app.dependencies import get_current_user, require_staff
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -71,3 +72,9 @@ def mock_login(request: MockLoginRequest, db: Session = Depends(get_db)):
 def read_current_user(current_user: User = Depends(get_current_user)):
     """Return currently authenticated user profile."""
     return UserOut.model_validate(current_user)
+
+@router.get("/agents", response_model=List[UserOut])
+def get_support_agents(current_user: User = Depends(require_staff), db: Session = Depends(get_db)):
+    """Retrieve list of active support agents for ticket assignment dropdowns."""
+    return db.query(User).filter(User.role == "AGENT").order_by(User.name.asc()).all()
+

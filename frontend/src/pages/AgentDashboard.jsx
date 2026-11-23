@@ -9,11 +9,13 @@ const AgentDashboard = () => {
   const [categories, setCategories] = useState([]);
   const [filters, setFilters] = useState({ status: '', priority: '', category_id: '', is_overdue: false, search: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const fetchTickets = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const params = {};
       if (filters.status) params.status = filters.status;
       if (filters.priority) params.priority = filters.priority;
@@ -25,6 +27,7 @@ const AgentDashboard = () => {
       setTickets(res.data);
     } catch (err) {
       console.error('Failed to load tickets queue:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load tickets queue.');
     } finally {
       setIsLoading(false);
     }
@@ -122,6 +125,15 @@ const AgentDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between text-xs text-rose-700 shadow-sm">
+          <span>{error}</span>
+          <button onClick={fetchTickets} className="font-semibold underline ml-2 hover:text-rose-900">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-gray-200">
         <div>

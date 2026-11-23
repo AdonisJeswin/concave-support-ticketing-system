@@ -57,3 +57,27 @@ def test_role_based_access_control(client, member_headers, agent_headers, admin_
     # Support Head can access admin metrics
     resp_head_admin = client.get("/api/admin/metrics", headers=admin_headers)
     assert resp_head_admin.status_code == 200
+
+def test_get_support_agents(client, member_headers, agent_headers, admin_headers):
+    # Member cannot access agents list (RBAC: requires staff)
+    resp_member = client.get("/api/auth/agents", headers=member_headers)
+    assert resp_member.status_code == 403
+
+    # Unauthenticated cannot access agents list
+    resp_unauth = client.get("/api/auth/agents")
+    assert resp_unauth.status_code == 401
+
+    # Agent can access agents list
+    resp_agent = client.get("/api/auth/agents", headers=agent_headers)
+    assert resp_agent.status_code == 200
+    agents_agent = resp_agent.json()
+    assert isinstance(agents_agent, list)
+    assert all(a["role"] == "AGENT" for a in agents_agent)
+
+    # Support Head can access agents list
+    resp_admin = client.get("/api/auth/agents", headers=admin_headers)
+    assert resp_admin.status_code == 200
+    agents_admin = resp_admin.json()
+    assert isinstance(agents_admin, list)
+    assert len(agents_admin) >= 1
+    assert any(a["email"] == "agent@test.com" for a in agents_admin)
