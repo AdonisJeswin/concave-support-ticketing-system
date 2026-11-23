@@ -8,11 +8,12 @@ Concave Insights conducts high-velocity consumer research studies operating in s
 
 ## 2. Tech Stack
 
-- **Backend**: Python with FastAPI (RESTful API, asynchronous request handling, background task scheduling)
-- **Frontend**: React with Vite (Single Page Application, responsive component architecture — Planned Day 4)
+- **Backend**: Python with FastAPI (RESTful API, asynchronous request handling, background task scheduling via lifespan)
+- **Frontend**: React 18 with Vite (Single Page Application, responsive component architecture, React Router v6)
 - **Database**: SQLite (Relational data storage with lightweight, zero-configuration local portability)
-- **ORM**: SQLAlchemy (Object-relational mapping, declarative schema, transaction management)
-- **Styling**: Tailwind CSS (Utility-first responsive design and consistent UI tokens)
+- **ORM**: SQLAlchemy (Object-relational mapping, declarative schema, transaction management, immutable SQLite triggers)
+- **Styling**: Tailwind CSS (Utility-first responsive design, modern SaaS design tokens, PostCSS build pipeline)
+- **Testing**: Pytest (Automated unit and integration test suite with SQLite in-memory fixtures)
 - **Version Control**: Git and GitHub
 
 ---
@@ -22,9 +23,14 @@ Concave Insights conducts high-velocity consumer research studies operating in s
 ### Prerequisites
 
 - Python 3.10+ (Tested on Python 3.13)
+- Node.js 18+ & npm
 - Git
 
-### 1. Environment Configuration
+---
+
+### Backend Setup
+
+#### 1. Environment Configuration
 
 Clone the repository and copy the environment template:
 
@@ -32,7 +38,7 @@ Clone the repository and copy the environment template:
 cp .env.example .env
 ```
 
-### 2. Dependency Installation
+#### 2. Dependency Installation
 
 Install backend dependencies from `requirements.txt`:
 
@@ -40,7 +46,7 @@ Install backend dependencies from `requirements.txt`:
 pip install -r requirements.txt
 ```
 
-### 3. Database Initialization & Seeding
+#### 3. Database Initialization & Seeding
 
 Run the repeatable seed script to create all seven SQLite tables, apply immutability triggers, and populate demo users, inquiry categories, SLA rules, and test tickets:
 
@@ -48,15 +54,15 @@ Run the repeatable seed script to create all seven SQLite tables, apply immutabi
 python seed.py
 ```
 
-### 4. Running Automated Tests
+#### 4. Running Automated Tests
 
-Execute the complete Pytest suite (25 automated test cases covering authentication, RBAC, ticket workflows, SLA mathematics, and audit triggers):
+Execute the complete Pytest suite (26 automated test cases covering authentication, RBAC, ticket workflows, SLA mathematics, auto-close maintenance, and audit triggers):
 
 ```bash
 python -m pytest -v
 ```
 
-### 5. Launching the Backend Server
+#### 5. Launching the Backend Server
 
 Start the FastAPI application with Uvicorn:
 
@@ -67,6 +73,40 @@ uvicorn backend.app.main:app --reload --port 8000
 - **Interactive API Documentation (Swagger UI)**: `http://localhost:8000/docs`
 - **Alternative Documentation (ReDoc)**: `http://localhost:8000/redoc`
 - **API Health Check**: `http://localhost:8000/health`
+
+---
+
+### Frontend Setup
+
+#### 1. Install Frontend Dependencies
+
+Navigate to the `frontend/` directory and install npm packages:
+
+```bash
+cd frontend
+npm install
+```
+
+#### 2. Start the Development Server
+
+Launch the Vite development server:
+
+```bash
+npm run dev
+```
+
+- **Frontend Application URL**: `http://localhost:5173`
+- *Note: Vite dev server automatically proxies `/api` requests to the FastAPI backend running at `http://localhost:8000`.*
+
+#### 3. Production Build Verification
+
+To verify or compile production assets:
+
+```bash
+npm run build
+```
+
+The compiled bundle is emitted to `frontend/dist/`.
 
 ---
 
@@ -82,7 +122,7 @@ The database seed script (`seed.py`) pre-configures standard test accounts acros
 | **MEMBER** | Adonis Jeswin | `member1@surveyuser.com` | `password123` | Ticket creation, tracking own tickets, thread responses, reopening within 7-day window |
 | **MEMBER** | Priya Sharma | `member2@surveyuser.com` | `password123` | Ticket creation, resolution confirmation, and thread communication |
 
-*Note: For testing, the `/api/auth/mock-login` endpoint also allows instant token generation by role.*
+*Note: On the frontend login page (`http://localhost:5173/login`), use the **"One-Click Evaluator Demo Access"** buttons to switch between Member, Support Agent, and Support Head roles instantly.*
 
 ---
 
@@ -111,15 +151,25 @@ The database seed script (`seed.py`) pre-configures standard test accounts acros
 - **Priority Modification with Audit Log**: Recalculates remaining SLA while preserving consumed active time (distinguishing paused from unpaused states) with mandatory audit reason.
 - **Support Head Escalation Triage**: Dedicated supervisor review and reassignment workflow returning escalated tickets to active handling (`ESCALATION_RESOLVED`) while preserving overdue deadlines.
 - **Executive Metrics & Policy Controls**: Real-time calculations for Total Open, Overdue, Escalated, Resolved Today, Average Resolution Time (ART), and category distributions.
-- **Automated Pytest Suite**: 25 automated unit and integration tests passing with 100% success rate.
+- **Automated Pytest Suite**: 26 automated unit and integration tests passing with 100% success rate.
 - **Repeatable Seed Data**: Automated generation of accounts, categories, and test tickets across all lifecycle states.
 
-### Planned — Day 4 Frontend Milestone
+### Completed — Day 4 Frontend Milestone
 
-- Member, Agent, and Support Head dashboards in React + Vite with Tailwind CSS.
-- Interactive ticket queue with real-time filters and search.
-- Conversation thread UI with Waiting-for-Member pause badge.
-- Support Head analytics visual charts and SLA configuration panel.
+- **Modern SaaS Single Page Application**: Built with React 18, Vite, and Tailwind CSS.
+- **Role-Aware Navigation Header**: Shows current authenticated user, role indicator badge, quick dashboard navigation, and role switcher logout.
+- **Evaluator One-Click Authentication**: Instant mock login role switcher supporting Member, Agent, and Support Head roles alongside email/password authentication.
+- **Member Dashboard**: Live ticket list with SLA badges, dynamic category selector showing default priority mappings, and ticket submission form.
+- **Agent Support Queue**: Real-time queue filtering (status, priority, category, overdue-only, search), one-click ticket claim, and reassignment dropdowns.
+- **Executive Console (Support Head)**: 5 KPI metric cards, category volume percentage progress bars, escalated tickets queue with directive reassignment prompt, TAT matrix editor, and global system policy controls.
+- **Interactive Ticket Details View**: Conversation thread, role-based reply controls with Waiting-for-Member pause toggle, member resume SLA banner, resolution notes, and timeline audit trail.
+
+### Completed — Day 5 Background Automation & Polish
+
+- **Automated 60-Second Lifespan Worker**: Asynchronous background maintenance scheduler running via FastAPI's `lifespan` context manager.
+- **Periodic Overdue Escalation**: Automatically identifies active, non-paused tickets exceeding `due_at` and transitions them to `ESCALATED` with audit history.
+- **Periodic Auto-Close**: Scans `RESOLVED` tickets exceeding `SYSTEM_SETTINGS.auto_close_days` and transitions them to `CLOSED` with system audit logging.
+- **Tailwind CSS Compilation Pipeline**: Configured PostCSS and Tailwind CSS v3 pipeline generating optimized utility classes with zero warnings.
 
 ---
 
@@ -139,6 +189,7 @@ Complete specifications for data persistence, entity relationships, integrity co
 - `POST /api/auth/token`: OAuth2 password request form for Swagger UI testing.
 - `POST /api/auth/mock-login`: Instant role-based authentication (`MEMBER`, `AGENT`, `SUPPORT_HEAD`).
 - `GET /api/auth/me`: Retrieve authenticated user profile.
+- `GET /api/auth/agents`: Retrieve list of active support agents for ticket reassignment dropdowns.
 
 ### Categories (`/api/categories`)
 - `GET /api/categories`: Retrieve active inquiry categories with default priority mappings.
@@ -161,7 +212,7 @@ Complete specifications for data persistence, entity relationships, integrity co
 - `PUT /api/admin/tat-settings/{priority}`: Update SLA turnaround hours for a priority level.
 - `GET /api/admin/system-settings`: Retrieve global reopening and auto-close parameters.
 - `PUT /api/admin/system-settings`: Update global system configuration.
-- `POST /api/admin/run-escalation-check`: Trigger background overdue SLA escalation scanner.
+- `POST /api/admin/run-escalation-check`: Manually trigger background overdue SLA escalation scanner.
 
 ---
 
@@ -229,15 +280,13 @@ Complete specifications for data persistence, entity relationships, integrity co
 
 ### Current Status
 
-- **Day 3 Backend Milestone Complete**: All backend models, API routes, RBAC permissions, SLA calculation engines, audit triggers, and test suites are implemented and validated (25/25 automated tests passing).
+- **Day 1 - Day 5 Complete**: All design specifications, backend database models, REST API routes, RBAC permissions, continuous 24/7 SLA calculation engine, 60-second periodic background escalation & auto-close worker, and the React + Vite + Tailwind CSS frontend portals (Member, Support Agent, and Support Head) are fully implemented, verified, and documented.
+- **Test Coverage**: 26/26 automated Pytest test cases passing with 100% success rate.
+- **Frontend Build**: Production asset build compiles cleanly with zero errors.
 
-### Planned Next Steps (Day 4 Frontend Milestone)
+### Final Verification Checklist
 
-1. Scaffold React frontend with Vite and Tailwind CSS.
-2. Implement mock authentication and role switcher UI for demonstration.
-3. Build Member Dashboard: ticket creation form, active ticket tracker, and conversation view.
-4. Build Agent Support Queue: multi-parameter filtering, search, self-assignment, and resolution workflow.
-5. Build Support Head Console: executive KPI cards, category breakdown charts, and SLA policy editor.
-6. Implement in-app escalation feed and supervisor reassignment dialog.
-7. Conduct full end-to-end user acceptance testing across frontend and backend.
-8. Validate production build and prepare final assessment submission deliverables.
+1. **Design Documents Frozen**: `design/database-erd.md` and `design/user-flow.md` remain 100% unchanged.
+2. **Backend Engine**: FastAPI server with automated background maintenance runs smoothly on `http://localhost:8000`.
+3. **Frontend Application**: Vite SPA runs cleanly on `http://localhost:5173` with real-time API integration.
+4. **Assessment Submission**: Deliverables ready for review.

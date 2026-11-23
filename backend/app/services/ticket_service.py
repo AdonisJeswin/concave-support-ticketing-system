@@ -294,6 +294,9 @@ def reassign_escalated_ticket(
     if ticket.status != "ESCALATED":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ticket is not in ESCALATED status")
 
+    if not directive_reason or len(directive_reason.strip()) < 5:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Directive reason must be at least 5 characters")
+
     new_agent = db.query(User).filter(User.id == new_agent_id, User.role.in_(["AGENT", "SUPPORT_HEAD"])).first()
     if not new_agent:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Target agent not found")
@@ -331,6 +334,12 @@ def update_priority(
 
     if ticket.priority == new_priority:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ticket already has this priority")
+
+    if not reason or len(reason.strip()) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Priority change requires a mandatory explanation of at least 5 characters"
+        )
 
     recalculate_on_priority_change(
         db=db,
@@ -420,6 +429,12 @@ def reopen_ticket(db: Session, ticket_id: int, member_user: User, reason: str) -
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot reopen ticket in '{ticket.status}' status. Only RESOLVED tickets are eligible."
+        )
+
+    if not reason or len(reason.strip()) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A descriptive reason of at least 10 characters is mandatory to reopen a ticket."
         )
 
     sys_settings = get_or_create_system_settings(db, admin_id=1)

@@ -21,7 +21,7 @@ class TicketStatus(str, Enum):
 class TicketCreate(BaseModel):
     category_id: int
     subject: str = Field(..., min_length=5, max_length=150)
-    description: str = Field(..., min_length=10, max_length=5000)
+    description: str = Field(..., min_length=10, max_length=3000)
 
 class TicketPriorityUpdate(BaseModel):
     priority: TicketPriority

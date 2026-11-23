@@ -233,3 +233,48 @@ def test_audit_history_immutability_trigger(db_session):
         db_session.commit()
     assert "TICKET_HISTORY is an immutable audit log: deletions are strictly prohibited" in str(exc_delete.value)
     db_session.rollback()
+
+def test_auto_close_resolved_tickets(client, member_headers, agent_headers, db_session):
+    """Verify that resolved tickets exceeding auto_close_days are transitioned to CLOSED with actor_id=None."""
+    from backend.app.services.sla_service import run_periodic_maintenance
+
+    # Create and resolve ticket
+    created = client.post(
+        "/api/tickets",
+        json={"category_id": 1, "subject": "Auto-close test ticket", "description": "Testing auto-close maintenance"},
+        headers=member_headers
+    ).json()
+    ticket_id = created["id"]
+
+    resolve_resp = client.post(
+        f"/api/tickets/{ticket_id}/resolve",
+        json={"resolution_note": "Issue sorted out"},
+        headers=agent_headers
+    )
+    assert resolve_resp.status_code == 200
+
+    t = db_session.query(Ticket).filter(Ticket.id == ticket_id).first()
+    assert t.status == "RESOLVED"
+
+    # Simulate resolved_at 8 days ago (exceeding default 7-day auto-close threshold)
+    t.resolved_at = datetime.now(timezone.utc) - timedelta(days=8)
+    db_session.commit()
+
+    # Run periodic maintenance
+    result = run_periodic_maintenance(db_session)
+    assert result["closed_count"] >= 1
+    assert ticket_id in result["closed_tickets"]
+
+    db_session.refresh(t)
+    assert t.status == "CLOSED"
+    assert t.closed_at is not None
+
+    # Verify audit history logged with actor_id=None
+    history_entry = (
+        db_session.query(TicketHistory)
+        .filter(TicketHistory.ticket_id == ticket_id, TicketHistory.action == "CLOSED")
+        .first()
+    )
+    assert history_entry is not None
+    assert history_entry.actor_id is None
+

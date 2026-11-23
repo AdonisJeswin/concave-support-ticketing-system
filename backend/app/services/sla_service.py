@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from backend.app.models.ticket import Ticket
-from backend.app.models.settings import TATSetting
+from backend.app.models.settings import TATSetting, SystemSetting
 from backend.app.services.audit_service import log_ticket_action
 from backend.app.config import settings
 
@@ -152,6 +152,7 @@ def check_and_escalate_overdue_tickets(db: Session) -> List[Ticket]:
     Background escalation scanner:
     Identifies all tickets where status NOT IN ('RESOLVED', 'CLOSED', 'ESCALATED')
     AND tat_paused_at IS NULL AND due_at <= CURRENT_TIMESTAMP.
+    Writes 'ESCALATED' to TICKET_HISTORY with actor_id = None.
     """
     now = datetime.now(timezone.utc)
     candidates = (
@@ -182,3 +183,59 @@ def check_and_escalate_overdue_tickets(db: Session) -> List[Ticket]:
     if escalated:
         db.commit()
     return escalated
+
+def check_and_autoclose_resolved_tickets(db: Session) -> List[Ticket]:
+    """
+    Background auto-close scanner:
+    Identifies all tickets where status == 'RESOLVED' and resolved_at exceeds auto_close_days.
+    Transitions status to 'CLOSED', sets closed_at, and writes 'CLOSED' to TICKET_HISTORY with actor_id = None.
+    """
+    sys_settings = db.query(SystemSetting).filter(SystemSetting.id == 1).first()
+    auto_close_days = sys_settings.auto_close_days if (sys_settings and sys_settings.auto_close_days is not None) else settings.DEFAULT_AUTO_CLOSE_DAYS
+    
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=auto_close_days)
+    
+    candidates = (
+        db.query(Ticket)
+        .filter(
+            Ticket.status == "RESOLVED",
+            Ticket.resolved_at.isnot(None),
+            Ticket.resolved_at <= cutoff
+        )
+        .all()
+    )
+    
+    closed = []
+    for t in candidates:
+        prev_status = t.status
+        t.status = "CLOSED"
+        t.closed_at = now
+        log_ticket_action(
+            db=db,
+            ticket_id=t.id,
+            action="CLOSED",
+            actor_id=None,
+            old_value=prev_status,
+            new_value="CLOSED",
+            reason=f"Auto-closed by system scheduler after exceeding {auto_close_days} days in RESOLVED status"
+        )
+        closed.append(t)
+    
+    if closed:
+        db.commit()
+    return closed
+
+def run_periodic_maintenance(db: Session) -> Dict[str, Any]:
+    """
+    Execute periodic maintenance: overdue ticket escalation and auto-closing resolved tickets.
+    """
+    escalated = check_and_escalate_overdue_tickets(db)
+    closed = check_and_autoclose_resolved_tickets(db)
+    return {
+        "escalated_count": len(escalated),
+        "closed_count": len(closed),
+        "escalated_ticket_ids": [t.id for t in escalated],
+        "closed_ticket_ids": [t.id for t in closed],
+        "closed_tickets": [t.id for t in closed]
+    }
