@@ -325,14 +325,21 @@ const AgentDashboard = () => {
                             </option>
                           ))}
                         </select>
-                      ) : (
+                      ) : t.status === 'ESCALATED' ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center text-xs font-semibold text-gray-400 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-md cursor-not-allowed"
+                        >
+                          Locked (Escalated)
+                        </button>
+                      ) : t.status !== 'CLOSED' ? (
                         <button
                           onClick={() => claimTicket(t.id)}
                           className="inline-flex items-center text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1 rounded-md shadow-sm transition-colors"
                         >
                           Claim
                         </button>
-                      )}
+                      ) : null}
 
                       <button
                         onClick={() => navigate(`/tickets/${t.id}`)}

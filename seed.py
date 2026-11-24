@@ -10,14 +10,34 @@ from datetime import datetime, timedelta, timezone
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath("."))
 
-from backend.app.database import init_db, SessionLocal
+from sqlalchemy import text
+from backend.app.database import engine, Base, init_db, SessionLocal
 from backend.app.models import (
     User, Category, Ticket, Reply, TicketHistory, TATSetting, SystemSetting
 )
 from backend.app.services.auth_service import hash_password
 from backend.app.services.audit_service import log_ticket_action
 
-def seed_database():
+def seed_database(reset: bool = True):
+    if reset:
+        print("Resetting database: dropping existing tables and triggers...")
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("PRAGMA foreign_keys=OFF;"))
+                conn.execute(text("DROP TRIGGER IF EXISTS trg_ticket_history_no_update;"))
+                conn.execute(text("DROP TRIGGER IF EXISTS trg_ticket_history_no_delete;"))
+                conn.commit()
+            Base.metadata.drop_all(bind=engine)
+        except Exception as e:
+            print(f"Note during drop_all: {e}")
+        finally:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("PRAGMA foreign_keys=ON;"))
+                    conn.commit()
+            except Exception:
+                pass
+
     print("Initializing database schema and triggers...")
     init_db()
     db = SessionLocal()
@@ -143,8 +163,8 @@ def seed_database():
         print("Seeding realistic sample tickets across all lifecycle states...")
         now = datetime.now(timezone.utc)
 
-        # 5. Seed Demonstration Tickets if table is empty
-        if db.query(Ticket).count() == 0:
+        # 5. Seed Demonstration Tickets
+        if reset or db.query(Ticket).count() == 0:
             sample_tickets = [
                 # Ticket 1: OPEN (Payment issue)
                 {
@@ -200,12 +220,12 @@ def seed_database():
                     "resolved_at": None,
                     "closed_at": None
                 },
-                # Ticket 4: ESCALATED (Overdue payment ticket)
+                # Ticket 4: ESCALATED (Overdue payment ticket, unassigned)
                 {
                     "number": "TKT-0004",
                     "member": member2,
                     "category": categories["Payment"],
-                    "agent": agent1,
+                    "agent": None,
                     "subject": "Referral bonus not credited for 3 enrolled participants",
                     "description": "Referred three verified colleagues who finished the 15-day study, bonus missing.",
                     "priority": "HIGH",
@@ -337,7 +357,7 @@ def seed_database():
                         ticket_id=ticket.id,
                         action="ESCALATED",
                         actor_id=None,
-                        old_value="IN_PROGRESS",
+                        old_value="OPEN",
                         new_value="ESCALATED",
                         reason="Resolution deadline exceeded active SLA threshold"
                     )
